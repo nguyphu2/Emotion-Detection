@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau    
 from torchvision import datasets, transforms, models    
 from torch.utils.data import DataLoader, random_split  
-
+import pdb
 
 
 
@@ -28,7 +28,6 @@ training_transform = transforms.Compose([transforms.Resize((224,224)),
                                         transforms.RandomResizedCrop(224, scale = (0.8,1.0)), transforms.ColorJitter(brightness =0.2, contrast = 0.2),
                                         transforms.ToTensor(), transforms.Normalize(mean=[0.485,0.456,0.406],std=[0.229,0.224,0.225])
                                         ])
-
 testing_transforms = transforms.Compose([
     transforms.Resize((224,224)),
     transforms.ToTensor(),
@@ -42,6 +41,7 @@ testing_transforms = transforms.Compose([
 # ---- Load Dataset ---- 
 
 dataset = datasets.ImageFolder(root=root)
+pdb.set_trace()
 
 
 
@@ -122,6 +122,7 @@ def training_loop(model, train_loader, val_loader, scheduler, epochs = 25):
         running_loss, correct, total = 0,0,0
         
         for images, labels in train_loader:
+            pdb.set_trace()
             images = images.to(device)
             labels = labels.to(device)
             
