@@ -39,32 +39,39 @@ testing_transforms = transforms.Compose([
 
 
 
-# ---- Load Dataset ---- 
+# ---- Load Dataset ----
 
-dataset = datasets.ImageFolder(root=root)
-#pdb.set_trace()
-
-
+base_dataset = datasets.ImageFolder(root=root)
+data_size = len(base_dataset)
 
 # ---- Splitting Dataset ----
-
 """
 70% train, 15% validation, 15% test
-
 """
-data_size = len(dataset)
 
 train_size = int(0.7 * data_size)
-
 val_size = int(0.15 * data_size)
-
 test_size = data_size - train_size - val_size
 
-train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+train_indices, val_indices, test_indices = random_split(
+    range(data_size),
+    [train_size, val_size, test_size]
+)
 
-train_dataset.dataset.transform = training_transform
-val_dataset.dataset.transform = testing_transforms
-test_dataset.dataset.transform = testing_transforms
+train_dataset = torch.utils.data.Subset(
+    datasets.ImageFolder(root=root, transform=training_transform),
+    train_indices.indices
+)
+
+val_dataset = torch.utils.data.Subset(
+    datasets.ImageFolder(root=root, transform=testing_transforms),
+    val_indices.indices
+)
+
+test_dataset = torch.utils.data.Subset(
+    datasets.ImageFolder(root=root, transform=testing_transforms),
+    test_indices.indices
+)
 
 # ---- DataLoader ----
 
@@ -79,17 +86,29 @@ model = models.resnet50(pretrained = True)
 for param in model.parameters():
     param.requires_grad = False
     
-model.fc = nn.Sequential(
-    nn.Linear(2048,512),
-    nn.ReLU(),
-    nn.Dropout(0.5),
-    nn.Linear(512,4)
-)
+
+
+
+# model.fc = nn.Sequential(
+#     nn.Linear(2048,512),
+#     nn.ReLU(),
+#     nn.Dropout(0.5),
+#     nn.Linear(512,4)
+# )
+
+#---- Standard Resnet Head ----
+
+"""
+Uncomment to run standard resnet fc
+
+"""
+
+model.fc = nn.Linear(model.fc.in_features, 4)
+
 
 
 
 model = model.to(device)
-
 
 criterion = nn.CrossEntropyLoss()
 
@@ -113,7 +132,7 @@ config = dict(
 )
 
 wandb.login()
-run = wandb.init(project = "Dog Emotion Detection", config = config, name = "resnet50_n")
+run = wandb.init(project = "Dog Emotion Detection", config = config, name = "resnet50_standard")
 
 
 
@@ -184,16 +203,9 @@ def evaluate(model, load, test = False):
             total += labels.size(0)
             
             correct += (predicted == labels).sum().item()
-        
-        if test:    
-            wandb.log({
-            'test/acc': 100.0 * correct/total,
-            'test/error': 100.0- (100.0 * correct/total),
-            'test/loss': total_loss/total
-            })
             
         
-    return total_loss/ total, 100.0 * correct/total
+    return total_loss/ total, correct/total
 
 
 
@@ -204,8 +216,13 @@ training_loop(model, train_loader, val_loader, scheduler, epochs = 25)
 for param in model.layer4.parameters():
     param.requires_grad = True
     
-optimizer = optim.Adam(model.parameters(), lr = 1e-5)
-scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2, verbose=True)
+optimizer = optim.Adam([
+    {"params": model.layer4.parameters(), "lr":1e-5},
+    {"params": model.fc.parameters(), "lr":1e-4}
+])
+
+
+scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
 
 
 training_loop(model, train_loader, val_loader, scheduler, epochs = 10)
