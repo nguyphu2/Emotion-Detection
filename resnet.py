@@ -38,10 +38,11 @@ testing_transforms = transforms.Compose([
 ])
 
 
+
 # ---- Load Dataset ---- 
 
 dataset = datasets.ImageFolder(root=root)
-pdb.set_trace()
+#pdb.set_trace()
 
 
 
@@ -85,7 +86,10 @@ model.fc = nn.Sequential(
     nn.Linear(512,4)
 )
 
+
+
 model = model.to(device)
+
 
 criterion = nn.CrossEntropyLoss()
 
@@ -122,7 +126,7 @@ def training_loop(model, train_loader, val_loader, scheduler, epochs = 25):
         running_loss, correct, total = 0,0,0
         
         for images, labels in train_loader:
-            pdb.set_trace()
+            #pdb.set_trace()
             images = images.to(device)
             labels = labels.to(device)
             
@@ -163,7 +167,7 @@ def training_loop(model, train_loader, val_loader, scheduler, epochs = 25):
         print(f'{epoch} | {train_loss:.4f} | {train_acc*100:.2f}% | {val_loss:.4f} | {val_acc:.2f}% | {current_lr:.5f}')
         
         
-def evaluate(model, load):
+def evaluate(model, load, test = False):
     model.eval()
     
     correct, total, total_loss = 0,0,0
@@ -180,6 +184,14 @@ def evaluate(model, load):
             total += labels.size(0)
             
             correct += (predicted == labels).sum().item()
+        
+        if test:    
+            wandb.log({
+            'test/acc': 100.0 * correct/total,
+            'test/error': 100.0- (100.0 * correct/total),
+            'test/loss': total_loss/total
+            })
+            
         
     return total_loss/ total, 100.0 * correct/total
 
@@ -200,24 +212,11 @@ training_loop(model, train_loader, val_loader, scheduler, epochs = 10)
 
 # ---- Testing ----
 
-test_loss, test_acc = evaluate(model, test_loader)
-
-
-#---- WandB Test Results ----
-wandb.log({
-        'test/acc': test_acc,
-        'test/error': 100.0- test_acc,
-})
+test_loss, test_acc = evaluate(model, test_loader, test=True)
 
 wandb.summary['test_acc'] = test_acc
 wandb.summary['test_loss'] = test_loss
+wandb.summary['test_error'] = 100 - test_acc
 torch.save(model.state_dict(), 'resnet50.pth')
 wandb.save('resnet50.pth')
 wandb.finish()
-
-            
-            
-        
-    
-            
-        
